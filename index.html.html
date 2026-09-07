@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HIROTO GYM">
+<meta name="theme-color" content="#0a0a0a">
+<title>HIROTO GYM TRACKER</title>
+
+<!-- PWA icons (inline SVG as data URIs) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230a0a0a'/%3E%3Ctext x='90' y='115' text-anchor='middle' font-size='90' font-family='system-ui'%3E🏋️%3C/text%3E%3C/svg%3E">
+
+<style>
+/* ── Reset & Base ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: #0a0a0a; }
+body {
+  font-family: -apple-system, 'Noto Sans JP', sans-serif;
+  color: #f4f0e8;
+  /* Safe area for iPhone notch/home indicator */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Typography ─────────────────────────────────── */
+.bebas { font-family: 'Bebas Neue', -apple-system, sans-serif; letter-spacing: 2px; }
+.mono  { font-family: 'SF Mono', 'Courier New', monospace; }
+
+/* ── Layout shell ───────────────────────────────── */
+#app {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ── Scrollable content ─────────────────────────── */
+.scroll-area {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 14px 15px calc(80px + env(safe-area-inset-bottom));
+}
+
+/* ── Bottom nav ─────────────────────────────────── */
+#bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(12,12,12,.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid #1e1e1e;
+  display: flex;
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 10px 0; border: none; background: none; cursor: pointer;
+  transition: opacity .15s;
+  -webkit-user-select: none; user-select: none;
+}
+.nav-btn:active { opacity: .6; }
+.nav-icon { font-size: 22px; line-height: 1; }
+.nav-label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; }
+
+/* ── Phase pills ────────────────────────────────── */
+.phase-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
+.phase-pill {
+  border-radius: 10px; padding: 9px 4px; text-align: center;
+  border: 1px solid; cursor: pointer; transition: all .2s;
+  -webkit-user-select: none; user-select: none;
+}
+.phase-pill:active { transform: scale(.96); }
+
+/* ── Day cards ──────────────────────────────────── */
+.day-card {
+  border-radius: 14px; overflow: hidden;
+  border: 1px solid #1e1e1e; margin-bottom: 10px;
+  transition: box-shadow .3s;
+  background: #111;
+}
+.day-card.is-today { box-shadow: 0 0 24px var(--day-color, #3ddc84)18; }
+.day-header {
+  display: flex; align-items: center; gap: 12; padding: 14px 16px; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.day-header:active { background: rgba(255,255,255,.03); }
+.day-body { border-top: 1px solid #1a1a1a; padding: 10px 12px 12px; }
+
+/* ── Task items ─────────────────────────────────── */
+.task-item {
+  border-radius: 10px; margin-bottom: 8px; overflow: hidden;
+  border: 1px solid #252525; background: #161616;
+  transition: border-color .25s, background .25s;
+}
+.task-item.done { background: rgba(var(--task-rgb,61,220,132),.05); }
+.task-row {
+  display: flex; align-items: center; gap: 10; padding: 12px 12px;
+  cursor: pointer; -webkit-user-select: none; user-select: none;
+}
+.task-row:active { background: rgba(255,255,255,.03); }
+.checkbox {
+  width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+  border: 2px solid #3a3a3a; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; color: #000;
+  transition: all .2s; flex-shrink: 0;
+}
+.task-label { font-size: 13.5px; font-weight: 600; color: #eee; line-height: 1.35; }
+.task-label.done { text-decoration: line-through; color: #555; font-weight: 400; }
+.task-time { font-size: 11px; color: #555; margin-top: 2px; }
+.task-badge {
+  font-size: 10px; font-family: monospace; padding: 2px 8px;
+  border-radius: 99px; white-space: nowrap;
+}
+
+/* ── Log sheet ──────────────────────────────────── */
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.8); backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: flex-end;
+  animation: fadeIn .2s ease;
+}
+.sheet {
+  width: 100%; background: #161616;
+  border-radius: 20px 20px 0 0;
+  border: 1px solid #2a2a2a; border-bottom: none;
+  padding: 0 18px calc(20px + env(safe-area-inset-bottom));
+  max-height: 88vh; overflow-y: auto;
+  animation: slideUp .3s cubic-bezier(.16,1,.3,1);
+}
+.sheet-handle {
+  width: 36px; height: 4px; background: #333; border-radius: 99px;
+  margin: 12px auto 16px;
+}
+.set-row { display: grid; grid-template-columns: 28px 1fr 1fr 44px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.set-input {
+  background: #1e1e1e; border: 1.5px solid #2a2a2a; border-radius: 10px;
+  padding: 12px; color: #eee; font-size: 16px; font-family: monospace;
+  width: 100%; outline: none; -webkit-appearance: none;
+  transition: border-color .2s;
+}
+.set-input:focus { border-color: var(--accent, #3ddc84); }
+.set-done-btn {
+  width: 44px; height: 44px; border-radius: 10px;
+  border: 2px solid #333; background: transparent;
+  font-size: 16px; cursor: pointer; transition: all .2s;
+}
+.save-btn {
+  width: 100%; padding: 15px; border: none; border-radius: 14px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  letter-spacing: .5px; margin-top: 8px;
+  -webkit-user-select: none; user-select: none;
+  transition: transform .1s, opacity .15s;
+}
+.save-btn:active { transform: scale(.97); opacity: .9; }
+
+/* ── Stat cards ─────────────────────────────────── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.stat-card {
+  background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
+  padding: 12px 8px; text-align: center;
+}
+.stat-val { font-size: 22px; line-height: 1; }
+.stat-lbl { font-size: 9px; color: #555; margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* ── Progress bar ───────────────────────────────── */
+.pbar-track { height: 6px; background: #1a1a1a; border-radius: 99px; overflow: hidden; }
+.pbar-fill  { height: 100%; border-radius: 99px; transition: width .7s cubic-bezier(.16,1,.3,1); }
+
+/* ── Log history ────────────────────────────────── */
+.log-card {
+  background: #111; border: 1px solid #1e1e1e; border-radius: 14px;
+  padding: 14px; margin-bottom: 10px;
+}
+.set-chip {
+  display: inline-flex; align-items: center;
+  background: #1a1a1a; border-radius: 8px;
+  padding: 5px 10px; font-size: 11px; font-family: monospace;
+  border: 1px solid #252525; margin: 3px;
+}
+
+/* ── Hero today card ────────────────────────────── */
+.today-hero {
+  border-radius: 16px; padding: 18px 16px; margin-bottom: 14px;
+  border: 1px solid;
+}
+.today-circle {
+  width: 60px; height: 60px; border-radius: 50%; border: 3px solid;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Info banner ────────────────────────────────── */
+.info-banner {
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+  border: 1px solid;
+}
+
+/* ── Confetti ───────────────────────────────────── */
+.confetti-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 999; overflow: hidden; }
+.confetti-piece { position: absolute; top: -16px; border-radius: 2px; }
+
+/* ── Empty state ────────────────────────────────── */
+.empty { text-align: center; padding: 60px 20px; }
+
+/* ── Animations ─────────────────────────────────── */
+@keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
+@keyframes slideUp  { from { transform: translateY(60px); opacity:0 } to { transform:none; opacity:1 } }
+@keyframes cfFall   {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity:1 }
+  100% { transform: translateY(110vh) rotate(720deg); opacity:0 }
+}
+
+/* ── Scrollbar ──────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+/* ── Textarea ───────────────────────────────────── */
+textarea {
+  width: 100%; background: #1e1e1e; border: 1.5px solid #2a2a2a;
+  border-radius: 10px; padding: 12px; color: #ccc; font-size: 14px;
+  font-family: -apple-system, sans-serif; resize: none; outline: none;
+  line-height: 1.6; -webkit-appearance: none;
+  transition: border-color .2s;
+}
+textarea:focus { border-color: #3ddc84; }
+</style>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+  <div class="scroll-area" id="scroll-area"></div>
+  <nav id="bottom-nav"></nav>
+</div>
+<div id="confetti-layer" class="confetti-wrap"></div>
+<div id="sheet-layer"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════════════════════════════════
+const PHASES = [
+  {
+    id:1, label:"PHASE 1", sub:"炎症管理・上半身強化", weeks:"9/7〜10/4", startDate:"2026-09-07", endDate:"2026-10-04", color:"#7abfff",
+    gymNote:"🏋️ エニタイム利用：上半身マシン・フリーウェイト（上半身のみ）",
+    goal:"腓骨癒合を守りながら上半身・体幹を集中強化。下肢への荷重・衝撃は一切禁止。",
+    warn:"⚠ 下肢への荷重・衝撃・回旋は全禁止。痛み・腫れが出たら即中止し主治医へ。",
+    next:"✓ 腫れ・熱感が消失 ✓ 歩行時に痛みゼロ ✓ 主治医の荷重許可",
+    schedule:[
+      { id:"p1-mon", day:"MON", dayJa:"月", color:"#7abfff", badge:"GYM 上半身プッシュ", type:"gym", tasks:[
+        {id:"p1-mon-1",time:"朝",label:"患部アイシング 15分 + 足首ポンピング20回",detail:"起床後すぐ実施。氷嚢をタオルで巻いて患部へ。"},
+        {id:"p1-mon-2",time:"ジム",label:"ベンチプレス 4×8（フラット）",detail:"肩甲骨を寄せて固定。バーをみぞおち付近に下ろし力強く押し上げる。"},
+        {id:"p1-mon-3",time:"ジム",label:"インクラインダンベルプレス 3×10",detail:"30〜45°のインクライン。大胸筋上部を刺激。"},
+        {id:"p1-mon-4",time:"ジム",label:"ケーブルフライ（ミドル）3×12",detail:"ケーブルを体の前で合わせる。大胸筋の伸展・収縮を最大化。"},
+        {id:"p1-mon-5",time:"ジム",label:"ショルダープレス（マシン）3×12",detail:"三角筋前部・中部。腰を反らさないように背もたれを使う。"},
+        {id:"p1-mon-6",time:"ジム",label:"ラテラルレイズ（ダンベル）3×15",detail:"肘をわずかに曲げて横に上げる。三角筋中部の孤立。"},
+        {id:"p1-mon-7",time:"ジム",label:"トライセップスプッシュダウン 3×15",detail:"肘を固定して前腕だけ動かす。上腕三頭筋の収縮を感じながら。"},
+        {id:"p1-mon-8",time:"帰宅後",label:"患部アイシング 15分 + 挙上",detail:"ジム後は必ずアイシング。患足を心臓より高く上げる。"},
+      ]},
+      { id:"p1-tue", day:"TUE", dayJa:"火", color:"#7abfff", badge:"体幹 + 非荷重下肢", type:"rehab", tasks:[
+        {id:"p1-tue-1",time:"朝",label:"足首ポンピング20回 + 患部状態チェック",detail:"腫れ・熱感・色の変化を毎朝記録。"},
+        {id:"p1-tue-2",time:"ジム",label:"アブドミナルマシン 4×15",detail:"腹直筋を集中的に鍛える。呼吸を止めないこと。"},
+        {id:"p1-tue-3",time:"ジム",label:"ケーブルウッドチョップ 3×12/側",detail:"体幹の回旋力。サッカーのキック・方向転換に直結。"},
+        {id:"p1-tue-4",time:"ジム",label:"ケーブルパロフプレス 3×12/側",detail:"体幹の回旋抵抗力。ケーブルを胸の前でまっすぐ押し出す。"},
+        {id:"p1-tue-5",time:"ジム",label:"レッグエクステンション（健側のみ）3×15",detail:"患側はNG。健側だけで大腿四頭筋の廃用萎縮を防ぐ。"},
+        {id:"p1-tue-6",time:"ジム",label:"ライイングレッグカール（健側のみ）3×15",detail:"ハムストリングスの廃用萎縮を防ぐ。"},
+        {id:"p1-tue-7",time:"ジム",label:"プランク 3×60秒 + デッドバグ 3×10/側",detail:"体幹深層筋の維持。腰を床に押しつけながら対角の手足を伸ばす。"},
+        {id:"p1-tue-8",time:"帰宅後",label:"アイシング + 全身ストレッチ 20分",detail:""},
+      ]},
+      { id:"p1-wed", day:"WED", dayJa:"水", color:"#7abfff", badge:"GYM 上半身プル", type:"gym", tasks:[
+        {id:"p1-wed-1",time:"朝",label:"足首ポンピング + 患部確認",detail:""},
+        {id:"p1-wed-2",time:"ジム",label:"ラットプルダウン 4×10",detail:"広背筋のメイン種目。バーを鎖骨に引き、肘を脇腹に向けて下げる。"},
+        {id:"p1-wed-3",time:"ジム",label:"シーテッドケーブルロウ 3×12",detail:"背中を丸めず、ハンドルを腹部に引く。"},
+        {id:"p1-wed-4",time:"ジム",label:"ワンアームダンベルロウ 3×10/側",detail:"ベンチに片手・片膝をついて安定させる。"},
+        {id:"p1-wed-5",time:"ジム",label:"フェイスプル（ケーブル）3×15",detail:"ロープをアイレベルにセット。両耳の横に向かって引く。"},
+        {id:"p1-wed-6",time:"ジム",label:"バーベルカール 3×12",detail:"肘を固定して丁寧に。反動で腰を使わない。"},
+        {id:"p1-wed-7",time:"ジム",label:"ハンマーカール 3×12/側",detail:"親指を上にして持つ。上腕筋・腕橈骨筋も同時に鍛える。"},
+        {id:"p1-wed-8",time:"帰宅後",label:"アイシング + ストレッチ 15分",detail:""},
+      ]},
+      { id:"p1-thu", day:"THU", dayJa:"木", color:"#7abfff", badge:"リカバリー", type:"recovery", tasks:[
+        {id:"p1-thu-1",time:"朝",label:"ウォーキング 20分（平地・ゆっくり）",detail:"痛みゼロを確認してから実施。正しい歩容を意識。"},
+        {id:"p1-thu-2",time:"朝",label:"足首モビリティ 全方向 × 15回",detail:"上下・内外・回旋。できる範囲だけ。"},
+        {id:"p1-thu-3",time:"朝",label:"ボックスブリーシング 5セット",detail:"4秒吸→4秒止→4秒吐→4秒止。副交感神経を優位にし治癒を促進。"},
+        {id:"p1-thu-4",time:"夜",label:"競技復帰イメージング 5分",detail:"フィールドでプレーしている自分を鮮明にイメージ。"},
+        {id:"p1-thu-5",time:"夜",label:"栄養チェック：タンパク質102〜136g/日",detail:"骨癒合にはカルシウム＋ビタミンDも重要。"},
+        {id:"p1-thu-6",time:"就寝前",label:"アイシング + 22時就寝・8時間睡眠",detail:"成長ホルモンは深睡眠中に最大分泌。骨癒合は睡眠中が最大。"},
+      ]},
+      { id:"p1-fri", day:"FRI", dayJa:"金", color:"#7abfff", badge:"GYM 肩 + 体幹", type:"gym", tasks:[
+        {id:"p1-fri-1",time:"朝",label:"ウォーキング 20〜25分 + 足首ポンピング",detail:""},
+        {id:"p1-fri-2",time:"ジム",label:"アーノルドプレス（ダンベル）4×10",detail:"三角筋前部・中部・後部を均等に鍛える。"},
+        {id:"p1-fri-3",time:"ジム",label:"ケーブルリアデルトフライ 3×15",detail:"三角筋後部。巻き肩・姿勢改善にも効果的。"},
+        {id:"p1-fri-4",time:"ジム",label:"シュラッグ（ダンベル）3×15",detail:"肩をまっすぐ上げて2秒保持。"},
+        {id:"p1-fri-5",time:"ジム",label:"アブホイール（膝つき）3×10",detail:"体幹全体への強烈な刺激。腰が落ちないところまで。"},
+        {id:"p1-fri-6",time:"ジム",label:"サイドプランク 3×45秒/側",detail:"中殿筋・体幹側面の維持。"},
+        {id:"p1-fri-7",time:"帰宅後",label:"アイシング + 全身ストレッチ 20分",detail:""},
+      ]},
+      { id:"p1-sat", day:"SAT", dayJa:"土", color:"#7abfff", badge:"アクティブリカバリー", type:"recovery", tasks:[
+        {id:"p1-sat-1",time:"午前",label:"ウォーキング 25〜30分（今週最長）",detail:"終了後に患部チェック。痛みなければ翌週延長。"},
+        {id:"p1-sat-2",time:"午前",label:"足首モビリティ 全方向 × 20回",detail:"可動域の改善を記録する。"},
+        {id:"p1-sat-3",time:"午後",label:"ヨガフロー（太陽礼拝）× 5セット",detail:"全身の血流促進と柔軟性維持。"},
+        {id:"p1-sat-4",time:"夜",label:"週間記録：患部状態・可動域メモ",detail:"翌週の通院時に主治医へ伝える材料にする。"},
+        {id:"p1-sat-5",time:"就寝前",label:"アイシング + 22時就寝",detail:""},
+      ]},
+      { id:"p1-sun", day:"SUN", dayJa:"日", color:"#7abfff", badge:"完全休養", type:"rest", tasks:[
+        {id:"p1-sun-1",time:"朝",label:"足首ポンピング + 患部週次チェック",detail:"腫れ・熱感・色を記録。"},
+        {id:"p1-sun-2",time:"日中",label:"チームの試合・練習を観戦（可能なら）",detail:"モチベーション維持と戦術理解が深まる。"},
+        {id:"p1-sun-3",time:"日中",label:"日光浴 15〜20分（ビタミンD補給）",detail:"骨癒合にビタミンDは必須。"},
+        {id:"p1-sun-4",time:"夜",label:"翌週の目標設定（1つだけ）",detail:"具体的な1目標を決める。"},
+        {id:"p1-sun-5",time:"就寝前",label:"アイシング + 22時就寝",detail:""},
+      ]},
+    ]
+  },
+  {
+    id:2, label:"PHASE 2", sub:"荷重漸増・下肢マシン", weeks:"10/5〜11/1", startDate:"2026-10-05", endDate:"2026-11-01", color:"#f4c542",
+    gymNote:"🏋️ エニタイム利用：レッグプレス・レッグカール・レッグエクステンション追加",
+    goal:"両脚への荷重を段階的に戻し下肢筋力を系統的に回復。速歩→軽いジョグへの橋渡し。",
+    warn:"⚠ 患部の痛み・腫れが再燃したら1段階前に戻す。痛みは守るべきサイン。",
+    next:"✓ レッグプレスで体重×1.5倍 ✓ 速歩30分で痛みなし ✓ 主治医の許可",
+    schedule:[
+      { id:"p2-mon", day:"MON", dayJa:"月", color:"#f4c542", badge:"GYM 上半身 + 下肢軽量", type:"gym", tasks:[
+        {id:"p2-mon-1",time:"朝",label:"速歩ウォーキング 20〜25分",detail:"息が少し上がる程度のペース。患部を常にモニタリング。"},
+        {id:"p2-mon-2",time:"ジム",label:"ベンチプレス 4×8（重量増）",detail:"フォームが崩れない最大重量を探る。"},
+        {id:"p2-mon-3",time:"ジム",label:"インクラインダンベルプレス 3×10",detail:""},
+        {id:"p2-mon-4",time:"ジム",label:"ケーブルフライ（ミドル）3×12",detail:""},
+        {id:"p2-mon-5",time:"ジム",label:"レッグプレス（両脚・浅め）3×15",detail:"⚠ 軽重量・膝45°の浅い可動域から。痛みがなければ徐々に深く・重く。"},
+        {id:"p2-mon-6",time:"ジム",label:"シーテッドカーフレイズ 3×20",detail:"膝90°でつま先を上げる。ヒラメ筋への直接刺激。"},
+        {id:"p2-mon-7",time:"ジム",label:"アブドミナル + パロフプレス 各3セット",detail:""},
+        {id:"p2-mon-8",time:"帰宅後",label:"アイシング 15分 + 患部チェック",detail:"荷重運動後は必ずアイシング。"},
+      ]},
+      { id:"p2-tue", day:"TUE", dayJa:"火", color:"#f4c542", badge:"GYM 下肢メイン + 有酸素", type:"gym", tasks:[
+        {id:"p2-tue-1",time:"ジム",label:"バイク（エルゴメーター）20分",detail:"低強度・低回転。心肺機能を落とさない最重要有酸素種目。"},
+        {id:"p2-tue-2",time:"ジム",label:"レッグプレス（両脚）4×12（重量漸増）",detail:"左右均等に押すことを意識。患部側が弱いので意識して使う。"},
+        {id:"p2-tue-3",time:"ジム",label:"レッグカール（ライイング）3×12",detail:"ゆっくり下ろすネガティブに集中。"},
+        {id:"p2-tue-4",time:"ジム",label:"レッグエクステンション（両脚→片脚）3×12",detail:"最初は両脚。患部側が健側と同重量で同回数できることが目標。"},
+        {id:"p2-tue-5",time:"ジム",label:"ヒップアブダクションマシン 3×15",detail:"中殿筋・小殿筋。サッカーの横方向の安定性に直結。"},
+        {id:"p2-tue-6",time:"ジム",label:"ラットプルダウン + シーテッドロウ 各3×10",detail:""},
+        {id:"p2-tue-7",time:"帰宅後",label:"アイシング + ストレッチ 20分",detail:""},
+      ]},
+      { id:"p2-wed", day:"WED", dayJa:"水", color:"#f4c542", badge:"GYM 上半身プル + コア", type:"gym", tasks:[
+        {id:"p2-wed-1",time:"朝",label:"速歩 25〜30分",detail:""},
+        {id:"p2-wed-2",time:"ジム",label:"ラットプルダウン 4×10（重量増）",detail:""},
+        {id:"p2-wed-3",time:"ジム",label:"チェストサポートロウ（マシン）3×12",detail:"胸を台に乗せて行うロウ。背中に完全集中できる。"},
+        {id:"p2-wed-4",time:"ジム",label:"ワンアームダンベルロウ 3×10/側",detail:""},
+        {id:"p2-wed-5",time:"ジム",label:"フェイスプル 3×15 + リアデルトフライ 3×15",detail:"肩後部・腱板の健康維持。"},
+        {id:"p2-wed-6",time:"ジム",label:"アブホイール 3×12 + プランク 3×60秒",detail:""},
+        {id:"p2-wed-7",time:"ジム",label:"バランスディスク片脚立ち 各1分/側",detail:"固有感覚の回復。"},
+        {id:"p2-wed-8",time:"帰宅後",label:"アイシング + ストレッチ",detail:""},
+      ]},
+      { id:"p2-thu", day:"THU", dayJa:"木", color:"#f4c542", badge:"リカバリー + スキル", type:"recovery", tasks:[
+        {id:"p2-thu-1",time:"朝",label:"軽いウォーキング 20分 + 足首モビリティ",detail:""},
+        {id:"p2-thu-2",time:"ジム",label:"バイク 15分 + ストレッチエリア使用",detail:"ジムのストレッチエリアでフォームローラーを活用。"},
+        {id:"p2-thu-3",time:"夜",label:"椅子座位でのボールタッチ練習 15分",detail:"インサイド・アウトサイド・インステップ。感覚を戻す。"},
+        {id:"p2-thu-4",time:"夜",label:"戦術映像分析 20分",detail:"自分のポジションの動きを分析。"},
+        {id:"p2-thu-5",time:"就寝前",label:"アイシング + 22時就寝",detail:""},
+      ]},
+      { id:"p2-fri", day:"FRI", dayJa:"金", color:"#f4c542", badge:"GYM 全身 + 機能回復", type:"gym", tasks:[
+        {id:"p2-fri-1",time:"朝",label:"速歩 or 軽いジョグ 20分（痛みゼロ条件）",detail:"ジョグは10〜15秒だけ試す。違和感があれば即ウォーキングへ。"},
+        {id:"p2-fri-2",time:"ジム",label:"レッグプレス（片脚交互）3×10/側",detail:"患側の筋力差を把握する。重量は両脚の60〜70%から。"},
+        {id:"p2-fri-3",time:"ジム",label:"ルーマニアンデッドリフト（軽量・両脚）3×12",detail:"軽重量からフォーム確認優先。痛みがある場合は省略。"},
+        {id:"p2-fri-4",time:"ジム",label:"ショルダープレス + ラテラルレイズ SS 3×10+15",detail:"スーパーセット。休憩なしでセットを繋げる。"},
+        {id:"p2-fri-5",time:"ジム",label:"バイク 15分 + ストレッチ",detail:""},
+        {id:"p2-fri-6",time:"帰宅後",label:"アイシング + 全身ストレッチ 20分",detail:""},
+      ]},
+      { id:"p2-sat", day:"SAT", dayJa:"土", color:"#f4c542", badge:"ロングウォーク + ケア", type:"recovery", tasks:[
+        {id:"p2-sat-1",time:"午前",label:"ウォーキング 30〜40分（今週最長）",detail:""},
+        {id:"p2-sat-2",time:"午前",label:"ドリブル練習（歩きながら）10分",detail:"走りはしない。ボールコントロールの感覚を戻す。"},
+        {id:"p2-sat-3",time:"午後",label:"ジム：バイク 20分 + フォームローラー",detail:""},
+        {id:"p2-sat-4",time:"夜",label:"週間記録：歩行距離・レッグプレス重量・患部状態",detail:""},
+        {id:"p2-sat-5",time:"就寝前",label:"アイシング + 22時就寝",detail:""},
+      ]},
+      { id:"p2-sun", day:"SUN", dayJa:"日", color:"#f4c542", badge:"チーム帯同 + 休養", type:"rest", tasks:[
+        {id:"p2-sun-1",time:"午前",label:"チームの試合帯同・ウォームアップ参加（歩く部分のみ）",detail:""},
+        {id:"p2-sun-2",time:"日中",label:"ビタミンD：日光浴 15〜20分",detail:""},
+        {id:"p2-sun-3",time:"日中",label:"栄養：カルシウム食材を意識（牛乳・ヨーグルト・小魚）",detail:""},
+        {id:"p2-sun-4",time:"夜",label:"翌週の目標設定 + アイシング + 22時就寝",detail:""},
+      ]},
+    ]
+  },
+  {
+    id:3, label:"PHASE 3", sub:"スポーツ動作導入", weeks:"11/2〜12/13", startDate:"2026-11-02", endDate:"2026-12-13", color:"#ff9f43",
+    gymNote:"🏋️ エニタイム利用：スクワットラック・バーベルデッドリフト 全器具解禁",
+    goal:"バーベルスクワット・デッドリフトを段階的に導入。ジョグから方向転換走へ。チーム練習部分参加開始。",
+    warn:"⚠ スクワットは痛みのない深さ・重量から。急な負荷増加は再骨折リスク。",
+    next:"✓ バックスクワット体重×1倍以上 ✓ 80%強度で20分ジョグ可 ✓ 主治医の競技復帰許可",
+    schedule:[
+      { id:"p3-mon", day:"MON", dayJa:"月", color:"#ff9f43", badge:"GYM 下半身（バーベル）", type:"gym", tasks:[
+        {id:"p3-mon-1",time:"朝",label:"テンポジョグ 15分（60〜70%強度）",detail:"会話できるペース。患部を感じながら走る。"},
+        {id:"p3-mon-2",time:"ジム",label:"バーベルバックスクワット 4×8",detail:"スクワットラック使用。バーだけから開始し痛みのない深さを確認。"},
+        {id:"p3-mon-3",time:"ジム",label:"ルーマニアンデッドリフト 3×10",detail:"ハムストリングスのストレッチを感じながらゆっくり。"},
+        {id:"p3-mon-4",time:"ジム",label:"レッグプレス（高重量）3×12",detail:"Phase2より重量を大幅に増やす。"},
+        {id:"p3-mon-5",time:"ジム",label:"レッグカール + レッグエクステンション SS 3×12",detail:"前後のバランスを取る。左右差10%以内が目標。"},
+        {id:"p3-mon-6",time:"ジム",label:"スタンディングカーフレイズ（マシン）3×20",detail:"ゆっくり上げてゆっくり下ろす。患部の反応を確認。"},
+        {id:"p3-mon-7",time:"帰宅後",label:"アイシング 10分 + プロテイン補給",detail:""},
+      ]},
+      { id:"p3-tue", day:"TUE", dayJa:"火", color:"#ff9f43", badge:"GYM 上半身 + アジリティ", type:"gym", tasks:[
+        {id:"p3-tue-1",time:"朝",label:"スプリント 20m × 6本（80%強度）",detail:"全力の80%程度。方向転換は伴わない直線のみ。"},
+        {id:"p3-tue-2",time:"朝",label:"方向転換走（緩い弧）× 5本",detail:"コーンを大きく弧を描いて回る。"},
+        {id:"p3-tue-3",time:"ジム",label:"ベンチプレス 4×6（高重量）",detail:"5RM付近を目指す。"},
+        {id:"p3-tue-4",time:"ジム",label:"ダンベルショルダープレス 3×10",detail:"マシンより不安定なダンベルで神経系も鍛える。"},
+        {id:"p3-tue-5",time:"ジム",label:"ディップス（マシン or 自重）3×10",detail:"大胸筋下部・三頭筋への強い刺激。"},
+        {id:"p3-tue-6",time:"ジム",label:"ケーブルウッドチョップ 3×12/側 + プランク 3×60秒",detail:""},
+        {id:"p3-tue-7",time:"帰宅後",label:"アイシング + ストレッチ",detail:""},
+      ]},
+      { id:"p3-wed", day:"WED", dayJa:"水", color:"#c47fff", badge:"🏃 チーム練習（部分参加）", type:"team", tasks:[
+        {id:"p3-wed-1",time:"練習前",label:"個人ウォームアップ 15分",detail:"状態を確認してから参加種目を決める。"},
+        {id:"p3-wed-2",time:"練習中",label:"ウォームアップ + パス練習のみ参加",detail:"スプリント・コンタクト・シュートはまだNG。"},
+        {id:"p3-wed-3",time:"練習後",label:"個人でジョグ 5〜10分追加",detail:""},
+        {id:"p3-wed-4",time:"練習後",label:"プロテイン + 糖質 10分以内補給",detail:""},
+        {id:"p3-wed-5",time:"練習後",label:"ストレッチ 全身 15分 + アイシング",detail:""},
+      ]},
+      { id:"p3-thu", day:"THU", dayJa:"木", color:"#ff9f43", badge:"リカバリー + スキル", type:"recovery", tasks:[
+        {id:"p3-thu-1",time:"ジム",label:"バイク 20分 + フォームローラー",detail:"水曜の疲労を抜く。"},
+        {id:"p3-thu-2",time:"夜",label:"ボール個人技術 20分（ジョグ強度まで）",detail:"ドリブル・パス・トラップ。走りながらのボール操作を再習得。"},
+        {id:"p3-thu-3",time:"夜",label:"バランストレーニング 片脚立ち 3×30秒/側",detail:"目を開けて・閉じて・ボールを受けながら。固有感覚の回復。"},
+        {id:"p3-thu-4",time:"就寝前",label:"22時就寝",detail:""},
+      ]},
+      { id:"p3-fri", day:"FRI", dayJa:"金", color:"#c47fff", badge:"🏃 チーム練習（参加拡大）", type:"team", tasks:[
+        {id:"p3-fri-1",time:"練習前",label:"90%スプリント 20m × 5本",detail:"全力に近い強度で患部を確認。"},
+        {id:"p3-fri-2",time:"練習中",label:"ウォームアップ + ポゼッション練習まで参加",detail:""},
+        {id:"p3-fri-3",time:"練習後",label:"プロテイン + 糖質補給 + アイシング",detail:""},
+        {id:"p3-fri-4",time:"夜",label:"22時就寝",detail:""},
+      ]},
+      { id:"p3-sat", day:"SAT", dayJa:"土", color:"#ff9f43", badge:"GYM 上半身プル + スプリント", type:"gym", tasks:[
+        {id:"p3-sat-1",time:"午前",label:"全力スプリント 30m × 5本",detail:"初めての全力スプリント。患部の反応を見ながら慎重に。"},
+        {id:"p3-sat-2",time:"午前",label:"方向転換スプリント（45°）× 5本",detail:"少し鋭い方向転換に挑戦。"},
+        {id:"p3-sat-3",time:"ジム",label:"デッドリフト 4×6（フォーム優先）",detail:"バーベルデッドリフト解禁。軽重量から開始。"},
+        {id:"p3-sat-4",time:"ジム",label:"チンアップ（懸垂）3×6〜8",detail:"できない場合はアシストマシンを使用。"},
+        {id:"p3-sat-5",time:"ジム",label:"バーベルカール + ハンマーカール 各3×10",detail:""},
+        {id:"p3-sat-6",time:"帰宅後",label:"アイシング + 全身ストレッチ + 週の記録",detail:""},
+      ]},
+      { id:"p3-sun", day:"SUN", dayJa:"日", color:"#ff9f43", badge:"チーム帯同 + 回復", type:"rest", tasks:[
+        {id:"p3-sun-1",time:"午前",label:"チームの試合帯同・ウォームアップ同行",detail:""},
+        {id:"p3-sun-2",time:"午前",label:"試合のベンチ帯同（戦術観察）",detail:""},
+        {id:"p3-sun-3",time:"日中",label:"週の記録：走行距離・スクワット重量・患部状態",detail:""},
+        {id:"p3-sun-4",time:"夜",label:"目標設定 + アイシング + 22時就寝",detail:""},
+      ]},
+    ]
+  },
+  {
+    id:4, label:"PHASE 4", sub:"競技復帰", weeks:"12/14〜1/24", startDate:"2026-12-14", endDate:"2027-01-24", color:"#3ddc84",
+    gymNote:"🏋️ エニタイム全器具フル活用・競技水準のウェイトトレーニング",
+    goal:"神奈川県1部リーグへの完全復帰。怪我前を超える体を作る。週2ジム×週2チーム練習×日曜試合。",
+    warn:"⚠ 患部の違和感は必ず主治医へ報告。完全復帰は主治医の最終許可後。",
+    next:"✓ スクワット体重×1.5倍 ✓ 全力スプリントで痛みなし ✓ 主治医の試合出場許可",
+    schedule:[
+      { id:"p4-mon", day:"MON", dayJa:"月", color:"#3ddc84", badge:"GYM 下半身メイン（最大強度）", type:"gym", tasks:[
+        {id:"p4-mon-1",time:"朝",label:"モビリティ起動 15分",detail:"股関節90/90・ワールドグレイテストストレッチ・アンクルモビリティ。"},
+        {id:"p4-mon-2",time:"ジム",label:"バーベルバックスクワット 4×6（体重×1〜1.5倍）",detail:"週の最重量日。ヒップドライブで力強く立ち上がる。"},
+        {id:"p4-mon-3",time:"ジム",label:"ルーマニアンデッドリフト 3×8（体重×1倍以上）",detail:"ハムストリングスの強さがスプリントとシュートに直結。"},
+        {id:"p4-mon-4",time:"ジム",label:"ブルガリアンスプリットスクワット 3×8/側",detail:"後ろ足をベンチに乗せる。サッカーの片脚動作に最も近い。"},
+        {id:"p4-mon-5",time:"ジム",label:"レッグカール + レッグエクステンション 各4×12",detail:"左右差ゼロを目指す。"},
+        {id:"p4-mon-6",time:"ジム",label:"スタンディングカーフレイズ（マシン）4×20",detail:"高重量・高回数。サッカーの走行の要。"},
+        {id:"p4-mon-7",time:"ジム",label:"アブドミナル + ウッドチョップ 各3セット",detail:""},
+        {id:"p4-mon-8",time:"帰宅後",label:"プロテイン補給 + アイシング + ストレッチ 20分",detail:""},
+      ]},
+      { id:"p4-tue", day:"TUE", dayJa:"火", color:"#3ddc84", badge:"爆発力 + スプリント", type:"strength", tasks:[
+        {id:"p4-tue-1",time:"朝",label:"全力スプリント 30m × 8本",detail:"各本の間は2分休憩。怪我前の速度を取り戻す。"},
+        {id:"p4-tue-2",time:"朝",label:"方向転換スプリント（45°・90°）各6本",detail:"サッカーの実際の動きに近い方向転換。"},
+        {id:"p4-tue-3",time:"朝",label:"バウンディング 3×15m往復",detail:"片脚ずつ遠くへ跳ぶ。爆発的推進力の完全回復。"},
+        {id:"p4-tue-4",time:"ジム",label:"ベンチプレス 4×6（最大強度）",detail:"体重×1〜1.2倍を目標。"},
+        {id:"p4-tue-5",time:"ジム",label:"デッドリフト 3×5（体重×1.5倍目標）",detail:"全身の筋力指標。フォームが崩れる前の重量で止める。"},
+        {id:"p4-tue-6",time:"ジム",label:"チンアップ 4×8（加重可）",detail:""},
+        {id:"p4-tue-7",time:"帰宅後",label:"プロテイン + アイシング + ストレッチ",detail:""},
+      ]},
+      { id:"p4-wed", day:"WED", dayJa:"水", color:"#c47fff", badge:"🏃 チーム練習（フル参加）", type:"team", tasks:[
+        {id:"p4-wed-1",time:"練習前",label:"個人ウォームアップ 15分 + スプリント確認",detail:""},
+        {id:"p4-wed-2",time:"練習中",label:"チーム練習フル参加（コンタクト含む）",detail:"主治医の許可のもと全メニューに参加。"},
+        {id:"p4-wed-3",time:"練習後",label:"プロテイン + 糖質 10分以内補給",detail:""},
+        {id:"p4-wed-4",time:"練習後",label:"患部セルフチェック + ストレッチ 15分",detail:"異常があれば翌日主治医へ連絡。"},
+      ]},
+      { id:"p4-thu", day:"THU", dayJa:"木", color:"#3ddc84", badge:"GYM 上半身 + リカバリー", type:"gym", tasks:[
+        {id:"p4-thu-1",time:"ジム",label:"バイク 15分（軽め）+ フォームローラー脚部",detail:"水曜の疲労抜き。"},
+        {id:"p4-thu-2",time:"ジム",label:"ラットプルダウン 4×10 + チェストサポートロウ 3×12",detail:""},
+        {id:"p4-thu-3",time:"ジム",label:"フェイスプル 3×15 + リアデルトフライ 3×15",detail:"肩の健康維持。競技復帰後も欠かさない。"},
+        {id:"p4-thu-4",time:"ジム",label:"アブホイール 3×15 + プランク 3×60秒",detail:""},
+        {id:"p4-thu-5",time:"夜",label:"ボール個人技術 30分（全力まで）",detail:"シュート・ドリブル・1対1動作。怪我前の感覚を完全に取り戻す。"},
+        {id:"p4-thu-6",time:"就寝前",label:"22時就寝",detail:""},
+      ]},
+      { id:"p4-fri", day:"FRI", dayJa:"金", color:"#c47fff", badge:"🏃 チーム練習（試合2日前）", type:"team", tasks:[
+        {id:"p4-fri-1",time:"練習前",label:"モビリティのみ 15分（ジム筋トレ禁止）",detail:"試合2日前はウェイト完全禁止。"},
+        {id:"p4-fri-2",time:"練習中",label:"チーム練習（試合強度）",detail:""},
+        {id:"p4-fri-3",time:"練習後",label:"プロテイン + 糖質ローディング開始",detail:"白米・パスタで炭水化物を増やす。"},
+        {id:"p4-fri-4",time:"夜",label:"水分 2〜2.5L確保 + ビジュアライゼーション 5分",detail:""},
+        {id:"p4-fri-5",time:"夜",label:"22時就寝・7時間以上確保",detail:""},
+      ]},
+      { id:"p4-sat", day:"SAT", dayJa:"土", color:"#f4c542", badge:"PRE-MATCH PREP", type:"prematch", tasks:[
+        {id:"p4-sat-1",time:"朝",label:"アクティベーション 15分（追い込み禁止）",detail:"動的ストレッチ・垂直ジャンプ3本・ストライド走3本。"},
+        {id:"p4-sat-2",time:"日中",label:"午後は積極的に休息",detail:"昼寝20〜30分もOK。"},
+        {id:"p4-sat-3",time:"夜",label:"炭水化物多め夕食・21時までに完了",detail:""},
+        {id:"p4-sat-4",time:"夜",label:"水分 2L以上 + ユニフォーム・スパイク準備確認",detail:""},
+        {id:"p4-sat-5",time:"夜",label:"ビジュアライゼーション 10分 + 22時就寝",detail:"腓骨骨折を乗り越えてピッチに立つ自分を鮮明にイメージ。"},
+      ]},
+      { id:"p4-sun", day:"SUN", dayJa:"日", color:"#e63946", badge:"⚽ 競技復帰 MATCH DAY", type:"match", tasks:[
+        {id:"p4-sun-1",time:"試合前",label:"ウォームアップ 20〜25分（FIFA 11+）",detail:"ジョグ→動的ストレッチ→方向転換走→スプリント→垂直ジャンプ×5。"},
+        {id:"p4-sun-2",time:"試合",label:"全力でプレー。リハビリで培った体幹・筋力を出し切る",detail:""},
+        {id:"p4-sun-3",time:"試合後",label:"プロテイン + バナナ（30分以内）",detail:""},
+        {id:"p4-sun-4",time:"試合後",label:"患部最終チェック + ストレッチ 15分",detail:"復帰後も患部確認は欠かさない。"},
+        {id:"p4-sun-5",time:"夜",label:"入浴 38〜40℃ 20分 + 振り返りメモ",detail:"良い点3・改善点3。"},
+        {id:"p4-sun-6",time:"夜",label:"23時前就寝・完全復帰を祝う",detail:"腓骨骨折 → 抜釘術 → エニタイム茅ヶ崎 → 神奈川県1部復帰。新しいスタート。"},
+      ]},
+    ]
+  }
+];
+
+const GYM_KW = ["ベンチプレス","スクワット","デッドリフト","レッグプレス","レッグカール","レッグエクステンション",
+  "ラットプルダウン","ロウ","ショルダープレス","ラテラルレイズ","カーフレイズ","プッシュダウン","カール",
+  "ケーブルフライ","チンアップ","懸垂","ディップス","シュラッグ","アブドミナル","ヒップアブダクション",
+  "アーノルド","インクライン","アブホイール","バイク"];
+const isGym = l => GYM_KW.some(k => l.includes(k));
+
+const DAY_MAP = {0:"sun",1:"mon",2:"tue",3:"wed",4:"thu",5:"fri",6:"sat"};
+const STORE_KEY = "hiroto_pwa_v1";
+
+function getWeekKey(){
+  const now=new Date();
+  const d=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()));
+  const day=d.getUTCDay()||7; d.setUTCDate(d.getUTCDate()+4-day);
+  const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const wk=Math.ceil((((d-ys)/86400000)+1)/7);
+  return `${d.getUTCFullYear()}-W${String(wk).padStart(2,"0")}`;
+}
+function load(){ try{return JSON.parse(localStorage.getItem(STORE_KEY)||"{}")}catch{return{}} }
+function save(d){ try{localStorage.setItem(STORE_KEY,JSON.stringify(d))}catch{} }
+
+// ── STATE ──────────────────────────────────────────────────────────
+// Auto-detect current phase from today's date
+function detectPhase(){
+  const today = new Date();
+  const toStr = d => d.toISOString().slice(0,10);
+  const ts = toStr(today);
+  for(const ph of PHASES){
+    if(ts >= ph.startDate && ts <= ph.endDate) return ph.id;
+  }
+  if(ts < PHASES[0].startDate) return 1;
+  return 4;
+}
+
+// Build week-slot calendar for a phase (Mon〜Sun blocks)
+function buildPhaseCalendar(ph){
+  const start = new Date(ph.startDate+"T00:00:00");
+  const end   = new Date(ph.endDate+"T00:00:00");
+  const weeks = [];
+  let cur = new Date(start);
+  // align to Monday
+  const dow = cur.getDay(); // 0=Sun
+  const diff = dow===0 ? 0 : (1 - dow + 7) % 7; // days to next Mon (0 if already Mon)
+  // actually start is always Mon in our data, but keep safe:
+  let weekStart = new Date(cur);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7)); // floor to Mon
+  while(weekStart <= end){
+    const days = [];
+    for(let i=0;i<7;i++){
+      const d = new Date(weekStart); d.setDate(weekStart.getDate()+i);
+      days.push(d <= end && d >= start ? d : null);
+    }
+    weeks.push({weekStart:new Date(weekStart), days});
+    weekStart.setDate(weekStart.getDate()+7);
+  }
+  return weeks;
+}
+
+let state = {
+  data: load(),
+  phase: detectPhase(),
+  tab: "today",
+  openDays: new Set(),
+  expandedTasks: new Set(),
+  sheet: null,
+  weekKey: getWeekKey(),
+  todayId: DAY_MAP[new Date().getDay()],
+  calOpen: false,
+};
+
+function setState(patch){ Object.assign(state, typeof patch==="function"?patch(state):patch); render(); }
+function saveState(){ save(state.data); }
+
+// ── HELPERS ────────────────────────────────────────────────────────
+function ck(taskId){ return `${state.phase}:${state.weekKey}:${taskId}`; }
+function isChecked(taskId){ return !!(state.data.checked||{})[ck(taskId)]; }
+function getLog(taskId){ return (state.data.logs||{})[ck(taskId)]; }
+function curPhase(){ return PHASES.find(p=>p.id===state.phase); }
+
+function toggle(taskId){
+  const key=ck(taskId);
+  const checked={...(state.data.checked||{})};
+  checked[key]=!checked[key];
+  state.data={...state.data,checked};
+  saveState();
+  // check day complete
+  const ph=curPhase();
+  const parts=taskId.split("-");
+  const dayId=parts.slice(0,2).join("-");
+  const day=ph.schedule.find(d=>d.id===dayId);
+  if(day && day.tasks.every(t=>checked[ck(t.id)])){
+    if(checked[key]) setTimeout(()=>launchConfetti(day.color),80);
+  }
+  renderMain();
+}
+
+function saveLog(taskId,logData){
+  const now=new Date();
+  const ds=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}`;
+  const logs={...(state.data.logs||{})};
+  const task=curPhase().schedule.flatMap(d=>d.tasks).find(t=>t.id===taskId);
+  logs[ck(taskId)]={...logData,label:task?.label||"",date:ds,weekKey:state.weekKey,phaseId:state.phase,savedAt:Date.now()};
+  state.data={...state.data,logs};
+  saveState();
+  state.sheet=null;
+  renderMain();
+  renderSheet();
+}
+
+// ── CONFETTI ───────────────────────────────────────────────────────
+function launchConfetti(color){
+  const layer=document.getElementById("confetti-layer");
+  layer.innerHTML="";
+  const colors=[color,"#f4c542","#e63946","#fff","#c47fff"];
+  for(let i=0;i<28;i++){
+    const el=document.createElement("div");
+    el.className="confetti-piece";
+    const c=colors[i%colors.length];
+    const size=6+Math.random()*9;
+    Object.assign(el.style,{
+      left:`${Math.random()*100}%`, width:size+"px", height:size+"px",
+      background:c, borderRadius:Math.random()>.5?"50%":"2px",
+      animation:`cfFall ${1.2+Math.random()*.9}s ease-in ${Math.random()*.6}s forwards`
+    });
+    layer.appendChild(el);
+  }
+  setTimeout(()=>layer.innerHTML="",2500);
+}
+
+// ── BADGE STYLES ───────────────────────────────────────────────────
+const BS={
+  gym:     {bg:"rgba(255,159,67,.13)",c:"#ff9f43",b:"rgba(255,159,67,.3)"},
+  strength:{bg:"rgba(61,220,132,.1)", c:"#3ddc84",b:"rgba(61,220,132,.25)"},
+  team:    {bg:"rgba(196,127,255,.1)",c:"#c47fff",b:"rgba(196,127,255,.25)"},
+  recovery:{bg:"rgba(122,191,255,.08)",c:"#7abfff",b:"rgba(122,191,255,.2)"},
+  rest:    {bg:"rgba(136,136,136,.08)",c:"#888",  b:"#333"},
+  prematch:{bg:"rgba(244,197,66,.08)",c:"#f4c542",b:"rgba(244,197,66,.2)"},
+  match:   {bg:"rgba(230,57,70,.1)",  c:"#e63946",b:"rgba(230,57,70,.25)"},
+  rehab:   {bg:"rgba(122,191,255,.1)",c:"#7abfff",b:"rgba(122,191,255,.25)"},
+  cardio:  {bg:"rgba(255,159,67,.08)",c:"#ff9f43",b:"rgba(255,159,67,.2)"},
+};
+
+// ── HTML BUILDERS ──────────────────────────────────────────────────
+function pbar(val,max,color,h=6){
+  const pct=Math.min(100,Math.round((val/max)*100));
+  return `<div class="pbar-track" style="height:${h}px"><div class="pbar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+}
+
+function buildTaskItem(task, dayColor){
+  const checked=isChecked(task.id);
+  const log=getLog(task.id);
+  const gym=isGym(task.label);
+  const hasLog=log&&log.sets&&log.sets.some(s=>s.kg||s.reps);
+  const best=hasLog?log.sets.filter(s=>s.kg).sort((a,b)=>parseFloat(b.kg)-parseFloat(a.kg))[0]:null;
+  const exp=state.expandedTasks.has(task.id);
+  const rgb=dayColor.replace("#","").match(/../g).map(x=>parseInt(x,16)).join(",");
+
+  let logBadge="";
+  if(hasLog&&best) logBadge=`<span class="task-badge" style="background:${dayColor}15;color:${dayColor};border:1px solid ${dayColor}30">最高 ${best.kg}kg×${best.reps}回</span>`;
+
+  let logBtn="";
+  if(gym) logBtn=`<button onclick="openSheet('${task.id}','${dayColor}')" style="padding:6px 10px;background:${hasLog?dayColor+"22":"#1e1e1e"};border:1px solid ${hasLog?dayColor+"55":"#333"};border-radius:8px;color:${hasLog?dayColor:"#666"};font-size:11px;cursor:pointer;white-space:nowrap">${hasLog?"📊 記録":"＋ 記録"}</button>`;
+
+  let detailBtn="";
+  if(task.detail) detailBtn=`<button onclick="toggleExpand('${task.id}')" style="padding:6px;background:none;border:none;color:#555;font-size:11px;cursor:pointer">${exp?"▲":"▼"}</button>`;
+
+  let detailEl="";
+  if(exp&&task.detail) detailEl=`<div style="padding:0 12px 12px 46px;font-size:12px;color:#888;line-height:1.7;border-top:1px solid #1e1e1e">${task.detail}</div>`;
+
+  let logPreview="";
+  if(hasLog){
+    const chips=log.sets.filter(s=>s.kg||s.reps).map((s,i)=>
+      `<span class="set-chip" style="color:${s.done?dayColor:"#666"};border-color:${s.done?dayColor+"35":"#252525"}">${i+1}. ${s.kg||"—"}kg×${s.reps||"—"}回 ${s.done?"✓":""}</span>`
+    ).join("");
+    const noteEl=log.note?`<div style="font-size:11px;color:#666;margin-top:8px;line-height:1.6;padding-top:8px;border-top:1px solid #1a1a1a">💬 ${log.note}</div>`:"";
+    logPreview=`<div style="padding:0 12px 10px 46px;border-top:1px solid #1a1a1a"><div style="margin-top:8px">${chips}</div>${noteEl}</div>`;
+  }
+
+  return `
+<div class="task-item${checked?" done":""}" id="task-${task.id}" style="--task-rgb:${rgb};${checked?`border-color:${dayColor}40;background:${dayColor}08`:""}">
+  <div class="task-row" onclick="toggle('${task.id}')">
+    <div class="checkbox" style="${checked?`background:${dayColor};border-color:${dayColor};box-shadow:0 0 10px ${dayColor}55`:`border-color:#3a3a3a`}">${checked?"✓":""}</div>
+    <div style="flex:1;min-width:0">
+      <div class="task-label${checked?" done":""}">${task.label}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap">
+        <span class="task-time">${task.time}</span>
+        ${logBadge}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">${logBtn}${detailBtn}</div>
+  </div>
+  ${detailEl}
+  ${logPreview}
+</div>`;
+}
+
+function buildDayCard(dayData){
+  const ph=state.phase;
+  const wk=state.weekKey;
+  const done=dayData.tasks.filter(t=>isChecked(t.id)).length;
+  const total=dayData.tasks.length;
+  const complete=done===total;
+  const isToday=dayData.id.replace(`p${ph}-`,"")=== state.todayId;
+  const open=state.openDays.has(dayData.id)||(isToday&&!state.openDays.has("__manual__"+dayData.id));
+  const bs=BS[dayData.type]||BS.recovery;
+
+  const tasksHtml=open?`<div class="day-body">${dayData.tasks.map(t=>buildTaskItem(t,dayData.color)).join("")}</div>`:"";
+
+  return `
+<div class="day-card${isToday?" is-today":""}" style="border-color:${isToday?dayData.color+"70":complete?dayData.color+"30":"#1e1e1e"};${isToday?`box-shadow:0 0 22px ${dayData.color}18`:""}" id="day-${dayData.id}">
+  <div class="day-header" onclick="toggleDay('${dayData.id}')">
+    <div style="width:44px;height:44px;border-radius:50%;flex-shrink:0;border:2px solid ${isToday?dayData.color:"#2a2a2a"};background:${complete?dayData.color+"22":"#0a0a0a"};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+      <span style="font-family:monospace;font-size:10px;font-weight:700;color:${dayData.color}">${dayData.day}</span>
+      <span style="font-size:9px;color:#555">${dayData.dayJa}</span>
+    </div>
+    <div style="flex:1;margin:0 10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap">
+        <span style="font-size:10px;padding:2px 9px;border-radius:99px;background:${bs.bg};color:${bs.c};border:1px solid ${bs.b};letter-spacing:1px">${dayData.badge}</span>
+        ${isToday?`<span style="font-size:10px;color:#f4c542;letter-spacing:2px;font-family:monospace">◉ TODAY</span>`:""}
+        ${complete?`<span style="font-size:10px;color:${dayData.color}">✓ DONE</span>`:""}
+      </div>
+      ${pbar(done,total,dayData.color)}
+      <div style="font-size:10px;color:#555;margin-top:4px;font-family:monospace">${done}/${total} タスク</div>
+    </div>
+    <span style="color:#444;font-size:12px;transform:${open?"rotate(180deg)":"none"};transition:transform .3s">▼</span>
+  </div>
+  ${tasksHtml}
+</div>`;
+}
+
+// ── TABS ───────────────────────────────────────────────────────────
+function buildToday(){
+  const ph=curPhase();
+  const todayDay=ph.schedule.find(d=>d.id.replace(`p${ph.id}-`,"")=== state.todayId);
+  if(!todayDay) return `<div class="empty"><div style="font-size:32px;margin-bottom:12px">📅</div><div style="font-size:13px;color:#555">今日のメニューはありません</div></div>`;
+  const done=todayDay.tasks.filter(t=>isChecked(t.id)).length;
+  const total=todayDay.tasks.length;
+  const pct=Math.round((done/total)*100);
+  const bs=BS[todayDay.type]||BS.recovery;
+
+  return `
+<div class="today-hero" style="background:linear-gradient(135deg,${todayDay.color}14 0%,#0a0a0a 65%);border-color:${todayDay.color}40">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div>
+      <div style="font-size:10px;color:${todayDay.color};letter-spacing:3px;font-family:monospace;margin-bottom:4px">TODAY — ${todayDay.dayJa}曜日</div>
+      <div class="bebas" style="font-size:22px;color:#eee">${todayDay.badge}</div>
+    </div>
+    <div class="today-circle" style="border-color:${todayDay.color};background:${done===total?todayDay.color+"28":"#0a0a0a"}">
+      <span class="bebas" style="font-size:18px;color:${todayDay.color}">${pct}%</span>
+    </div>
+  </div>
+  ${pbar(done,total,todayDay.color,8)}
+  <div style="font-size:11px;color:#666;margin-top:8px;font-family:monospace">
+    ${done===total?"🎉 本日のトレーニング完了！最高！":`残り ${total-done} タスク — やり切れ！`}
+  </div>
+</div>
+${todayDay.tasks.map(t=>buildTaskItem(t,todayDay.color)).join("")}`;
+}
+
+function buildWeek(){
+  const ph=curPhase();
+  return ph.schedule.map(d=>buildDayCard(d)).join("");
+}
+
+function buildLogs(){
+  const logs=state.data.logs||{};
+  const entries=Object.entries(logs).filter(([,v])=>v.sets?.some(s=>s.kg||s.reps)).sort((a,b)=>(b[1].savedAt||0)-(a[1].savedAt||0));
+  if(!entries.length) return `<div class="empty"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px;color:#555;font-weight:600">記録がまだありません</div><div style="font-size:12px;color:#3a3a3a;margin-top:8px">種目の「＋記録」ボタンから<br>重量・回数を入力してください</div></div>`;
+
+  const byDate={};
+  entries.forEach(([id,v])=>{ const d=v.date||"不明"; if(!byDate[d])byDate[d]=[]; byDate[d].push([id,v]); });
+
+  return Object.entries(byDate).map(([date,items])=>{
+    const cards=items.map(([id,v])=>{
+      const ph=PHASES.find(p=>p.id===v.phaseId);
+      const color=ph?.color||"#3ddc84";
+      const maxKg=Math.max(...v.sets.filter(s=>s.kg).map(s=>parseFloat(s.kg)||0),0);
+      const vol=v.sets.filter(s=>s.kg&&s.reps).reduce((s,r)=>s+(parseFloat(r.kg)||0)*(parseInt(r.reps)||0),0);
+      const chips=v.sets.filter(s=>s.kg||s.reps).map((s,i)=>
+        `<span class="set-chip" style="color:${s.done?color:"#666"};border-color:${s.done?color+"35":"#252525"}">${i+1}. ${s.kg||"—"}kg×${s.reps||"—"} ${s.done?"✓":""}</span>`
+      ).join("");
+      const noteEl=v.note?`<div style="font-size:11px;color:#666;margin-top:10px;line-height:1.6;border-top:1px solid #1a1a1a;padding-top:8px">💬 ${v.note}</div>`:"";
+      return `
+<div class="log-card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div style="flex:1;margin-right:10px">
+      <div style="font-size:13px;font-weight:700;color:#ddd;line-height:1.4">${v.label}</div>
+      <div style="font-size:10px;color:${color};margin-top:3px;font-family:monospace">${ph?.label||""} — ${v.weekKey||""}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      ${maxKg>0?`<div style="font-family:monospace;font-size:20px;font-weight:700;color:${color};line-height:1">${maxKg}kg</div>`:""}
+      ${vol>0?`<div style="font-size:10px;color:#555">総負荷 ${vol.toLocaleString()}kg</div>`:""}
+    </div>
+  </div>
+  <div>${chips}</div>
+  ${noteEl}
+</div>`;
+    }).join("");
+    return `<div style="margin-bottom:18px"><div style="font-size:10px;color:#555;letter-spacing:3px;font-family:monospace;margin-bottom:8px;padding-left:2px">${date}</div>${cards}</div>`;
+  }).join("");
+}
+
+// ── HEADER ─────────────────────────────────────────────────────────
+function buildHeader(){
+  const ph=curPhase();
+  const allTasks=ph.schedule.flatMap(d=>d.tasks);
+  const done=allTasks.filter(t=>isChecked(t.id)).length;
+  const total=allTasks.length;
+  const pct=Math.round((done/total)*100);
+  const days=ph.schedule.filter(d=>d.tasks.every(t=>isChecked(t.id))).length;
+  const logCount=Object.values(state.data.logs||{}).filter(v=>v.sets?.some(s=>s.kg||s.reps)).length;
+
+  const pills=PHASES.map(p=>`
+<div class="phase-pill" onclick="setPhase(${p.id})" style="background:${state.phase===p.id?p.color+"22":"#111"};border-color:${state.phase===p.id?p.color:"#252525"}">
+  <div class="bebas" style="font-size:13px;color:${state.phase===p.id?p.color:"#555"}">${p.label}</div>
+  <div style="font-size:9px;color:${state.phase===p.id?p.color+"cc":"#444"};margin-top:2px;line-height:1.3">${p.weeks}</div>
+</div>`).join("");
+
+  return `
+<div style="padding:14px 15px 12px;border-bottom:1px solid #1a1a1a;background:#0c0c0c">
+  <div style="font-size:10px;color:${ph.color};letter-spacing:4px;margin-bottom:3px;font-family:monospace">REHAB × GYM — ${state.weekKey}</div>
+  <div class="bebas" style="font-size:28px;line-height:1">TANAKA HIROTO</div>
+  <div style="font-size:11px;color:#444;margin-top:2px">腓骨骨折 抜釘術後 × エニタイム茅ヶ崎 → 神奈川県1部復帰</div>
+
+  <div class="phase-row">${pills}</div>
+
+  <div class="info-banner" style="background:${ph.color}0e;border-color:${ph.color}30;margin-bottom:8px">
+    <div style="font-size:12px;font-weight:700;color:${ph.color};margin-bottom:3px">${ph.label} — ${ph.sub}</div>
+    <div style="font-size:11px;color:#999;line-height:1.6;margin-bottom:6px">${ph.goal}</div>
+    <div style="font-size:11px;color:#e63946;line-height:1.5">${ph.warn}</div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val bebas" style="color:${ph.color}">${pct}%</div><div class="stat-lbl">週間達成率</div></div>
+    <div class="stat-card"><div class="stat-val bebas" style="color:${ph.color}">${done}/${total}</div><div class="stat-lbl">タスク</div></div>
+    <div class="stat-card"><div class="stat-val bebas" style="color:${ph.color}">${logCount}件</div><div class="stat-lbl">ログ総数</div></div>
+  </div>
+
+  <div style="margin-top:10px">
+    ${pbar(done,total,ph.color,8)}
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-top:5px;font-family:monospace">
+      <span>${days}/7日 完了</span><span>${pct}%</span>
+    </div>
+  </div>
+
+  <div style="background:#111;border:1px solid #222;border-radius:10px;padding:10px 12px;margin-top:8px">
+    <div style="font-size:9px;color:#555;letter-spacing:2px;margin-bottom:5px;font-family:monospace">NEXT PHASE CRITERIA</div>
+    <div style="font-size:11px;color:#3ddc84;line-height:1.7">${ph.next}</div>
+  </div>
+</div>`;
+}
+
+// ── BOTTOM NAV ─────────────────────────────────────────────────────
+function buildNav(){
+  const tabs=[["today","🏠","TODAY"],["week","📅","全曜日"],["logs","📊","ログ"],["cal","🗓","日程"]];
+  const ph=curPhase();
+  return tabs.map(([k,icon,label])=>`
+<button class="nav-btn" onclick="setTab('${k}')">
+  <span class="nav-icon">${icon}</span>
+  <span class="nav-label" style="color:${state.tab===k?ph.color:"#555"}">${label}</span>
+  ${state.tab===k?`<div style="position:absolute;bottom:env(safe-area-inset-bottom);left:50%;transform:translateX(-50%);width:20px;height:2px;background:${ph.color};border-radius:99px"></div>`:""}
+</button>`).join("");
+}
+
+// ── LOG SHEET ──────────────────────────────────────────────────────
+function renderSheet(){
+  const layer=document.getElementById("sheet-layer");
+  if(!state.sheet){ layer.innerHTML=""; return; }
+  const {task,color}=state.sheet;
+  const existing=getLog(task.id);
+  const sets=existing?.sets||[{kg:"",reps:"",done:false}];
+  const note=existing?.note||"";
+
+  // Store sets in a temp global for the sheet
+  window._sheetSets=JSON.parse(JSON.stringify(sets));
+  window._sheetNote=note;
+
+  layer.innerHTML=`
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="font-size:10px;color:${color};letter-spacing:3px;font-family:monospace;margin-bottom:6px">WORKOUT LOG</div>
+    <div style="font-size:14px;font-weight:700;color:#eee;margin-bottom:18px;line-height:1.4">${task.label}</div>
+
+    <div style="display:grid;grid-template-columns:28px 1fr 1fr 44px;gap:8px;margin-bottom:8px;font-size:10px;color:#555;letter-spacing:1px;font-family:monospace">
+      <span>SET</span><span>重量(kg)</span><span>回数</span><span></span>
+    </div>
+    <div id="set-rows"></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button onclick="addSheetSet('${color}')" style="flex:1;padding:10px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:10px;color:#888;font-size:12px;cursor:pointer">＋ セット追加</button>
+      <button onclick="removeSheetSet('${color}')" style="padding:10px 14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:10px;color:#555;font-size:12px;cursor:pointer">削除</button>
+    </div>
+
+    <textarea id="sheet-note" rows="2" placeholder="メモ（体調・フォームの気づきなど）">${note}</textarea>
+
+    <button class="save-btn" style="background:${color};color:#000;margin-top:12px" onclick="commitLog('${task.id}','${color}')">💾 保存する</button>
+  </div>
+</div>`;
+  renderSetRows(color);
+}
+
+function renderSetRows(color){
+  const rows=document.getElementById("set-rows");
+  if(!rows) return;
+  rows.innerHTML=window._sheetSets.map((s,i)=>`
+<div class="set-row">
+  <div style="font-family:monospace;font-size:14px;font-weight:700;color:${s.done?color:"#555"};text-align:center">${i+1}</div>
+  <input class="set-input" type="number" inputmode="decimal" placeholder="0" value="${s.kg}"
+    oninput="updateSet(${i},'kg',this.value,'${color}')"
+    style="border-color:${s.done?color+"70":"#2a2a2a"}">
+  <input class="set-input" type="number" inputmode="numeric" placeholder="0" value="${s.reps}"
+    oninput="updateSet(${i},'reps',this.value,'${color}')"
+    style="border-color:${s.done?color+"70":"#2a2a2a"}">
+  <button class="set-done-btn" onclick="toggleSetDone(${i},'${color}')"
+    style="border-color:${s.done?color:"#333"};background:${s.done?color+"25":"transparent"};color:${s.done?color:"#555"}">
+    ${s.done?"✓":"○"}
+  </button>
+</div>`).join("");
+}
+
+window.updateSet=(i,field,val,color)=>{ window._sheetSets[i][field]=val; renderSetRows(color); };
+window.toggleSetDone=(i,color)=>{ window._sheetSets[i].done=!window._sheetSets[i].done; renderSetRows(color); };
+window.addSheetSet=(color)=>{ const last=window._sheetSets[window._sheetSets.length-1]||{}; window._sheetSets.push({kg:last.kg||"",reps:last.reps||"",done:false}); renderSetRows(color); };
+window.removeSheetSet=(color)=>{ if(window._sheetSets.length>1){window._sheetSets.pop();renderSetRows(color);} };
+window.commitLog=(taskId,color)=>{
+  window._sheetNote=document.getElementById("sheet-note")?.value||"";
+  saveLog(taskId,{sets:window._sheetSets,note:window._sheetNote});
+};
+window.closeSheet=()=>{ state.sheet=null; renderSheet(); };
+window.openSheet=(taskId,color)=>{
+  const task=curPhase().schedule.flatMap(d=>d.tasks).find(t=>t.id===taskId);
+  if(!task) return;
+  state.sheet={task,color};
+  renderSheet();
+};
+
+
+// ── CALENDAR TAB ───────────────────────────────────────────────────
+function buildCal(){
+  const DAY_LABELS=["月","火","水","木","金","土","日"];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const toYMD = d => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+
+  // Phase timeline bar
+  const timelineHtml = PHASES.map(ph=>{
+    const isActive = ph.id === state.phase;
+    const isPast   = new Date(ph.endDate+"T23:59:59") < today;
+    return `<div onclick="setPhase(${ph.id})" style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;cursor:pointer;
+      background:${isActive?ph.color+"22":isPast?"#0f0f0f":"#111"};
+      border:1px solid ${isActive?ph.color:isPast?"#1a1a1a":"#252525"};
+      transition:all .2s">
+      <div style="font-family:monospace;font-size:10px;font-weight:700;color:${isActive?ph.color:isPast?"#333":"#555"}">${ph.label}</div>
+      <div style="font-size:8px;color:${isActive?ph.color+"bb":isPast?"#2a2a2a":"#3a3a3a"};margin-top:2px;line-height:1.3">${ph.weeks}</div>
+      ${isPast?`<div style="font-size:9px;color:#3a3a3a;margin-top:2px">完了</div>`:""}
+      ${isActive?`<div style="font-size:9px;color:${ph.color};margin-top:2px">● NOW</div>`:""}
+    </div>`;
+  }).join("");
+
+  // Big schedule milestones
+  const milestones = [
+    {date:"2026-09-07",label:"リハビリ開始",icon:"🏥",color:"#7abfff"},
+    {date:"2026-10-05",label:"PHASE 2 開始 / 下肢マシン解禁",icon:"🦵",color:"#f4c542"},
+    {date:"2026-11-02",label:"PHASE 3 開始 / 全器具解禁",icon:"🏋️",color:"#ff9f43"},
+    {date:"2026-11-02",label:"チーム練習 部分参加開始",icon:"⚽",color:"#c47fff"},
+    {date:"2026-12-14",label:"PHASE 4 開始 / チーム練習フル参加",icon:"🔥",color:"#3ddc84"},
+    {date:"2027-01-24",label:"神奈川県1部リーグ 完全復帰目標",icon:"🏆",color:"#f4c542"},
+  ];
+
+  const msHtml = milestones.map(m=>{
+    const mDate = new Date(m.date+"T00:00:00");
+    const diff  = Math.round((mDate - today)/(1000*60*60*24));
+    const passed = diff < 0;
+    const isToday2 = diff === 0;
+    let diffLabel="";
+    if(isToday2) diffLabel=`<span style="color:${m.color};font-weight:700">TODAY</span>`;
+    else if(passed) diffLabel=`<span style="color:#444">${Math.abs(diff)}日前</span>`;
+    else diffLabel=`<span style="color:${m.color}">あと${diff}日</span>`;
+
+    return `<div style="display:flex;align-items:center;gap:12px;padding:13px 14px;
+      background:${isToday2?m.color+"18":"#111"};
+      border:1px solid ${isToday2?m.color+"60":passed?"#1a1a1a":"#1e1e1e"};
+      border-radius:12px;margin-bottom:8px;opacity:${passed?.5:1}">
+      <div style="font-size:24px;flex-shrink:0">${m.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:${isToday2?700:600};color:${passed?"#444":"#ddd"}">${m.label}</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;font-family:monospace">${m.date.replace(/-/g,"/")}　${diffLabel}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Weekly calendar for current phase
+  const ph = curPhase();
+  const cal = buildPhaseCalendar(ph);
+  const DAY_MAP_REV = ["sun","mon","tue","wed","thu","fri","sat"];
+
+  const calHtml = cal.map((week,wi)=>{
+    const wsLabel = toYMD(week.weekStart);
+    const dayBoxes = week.days.map((d,di)=>{
+      if(!d){ return `<div style="flex:1;height:52px"></div>`; }
+      const isT = d.getTime()===today.getTime();
+      const dayKey = DAY_MAP_REV[d.getDay()];
+      const dayData = ph.schedule.find(s=>s.id===`p${ph.id}-${dayKey}`);
+      const done = dayData ? dayData.tasks.filter(t=>isChecked(t.id)).length : 0;
+      const total = dayData ? dayData.tasks.length : 0;
+      const pct = total>0 ? Math.round((done/total)*100) : 0;
+      const complete = done===total && total>0;
+      const dayColor = dayData?.color || ph.color;
+      const bs = dayData ? (BS[dayData.type]||BS.recovery) : {c:"#555"};
+
+      return `<div onclick="setTab('week')" style="flex:1;height:52px;border-radius:9px;
+        background:${isT?dayColor+"28":complete?dayColor+"14":"#1a1a1a"};
+        border:1.5px solid ${isT?dayColor:complete?dayColor+"50":"#252525"};
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        cursor:pointer;transition:all .2s;position:relative;overflow:hidden">
+        <div style="font-size:9px;color:${isT?dayColor:complete?dayColor:"#666"};font-weight:${isT?700:400}">${["日","月","火","水","木","金","土"][d.getDay()]}</div>
+        <div style="font-size:12px;font-weight:700;color:${isT?dayColor:complete?dayColor:"#888"}">${d.getDate()}</div>
+        ${total>0?`<div style="width:80%;height:2px;background:#1a1a1a;border-radius:99px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${dayColor}"></div></div>`:""}
+        ${isT?`<div style="position:absolute;top:3px;right:4px;width:5px;height:5px;border-radius:50%;background:${dayColor}"></div>`:""}
+        ${complete?`<div style="position:absolute;bottom:3px;right:4px;font-size:8px;color:${dayColor}">✓</div>`:""}
+      </div>`;
+    }).join("");
+
+    return `<div style="margin-bottom:10px">
+      <div style="font-size:9px;color:#444;letter-spacing:2px;font-family:monospace;margin-bottom:6px">Week ${wi+1} — ${wsLabel}〜</div>
+      <div style="display:flex;gap:4px">${dayBoxes}</div>
+    </div>`;
+  }).join("");
+
+  // days remaining in current phase
+  const phEnd = new Date(ph.endDate+"T23:59:59");
+  const daysLeft = Math.max(0, Math.ceil((phEnd-today)/(1000*60*60*24)));
+  const phStart = new Date(ph.startDate+"T00:00:00");
+  const phTotal = Math.ceil((phEnd-phStart)/(1000*60*60*24));
+  const phPassed = Math.min(phTotal, phTotal - daysLeft);
+  const phPct = Math.round((phPassed/phTotal)*100);
+
+  return `
+<div style="margin-bottom:18px">
+  <div style="font-size:10px;color:#555;letter-spacing:3px;font-family:monospace;margin-bottom:8px">PHASE TIMELINE</div>
+  <div style="display:flex;gap:5px">${timelineHtml}</div>
+</div>
+
+<div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:14px;margin-bottom:14px">
+  <div style="font-size:10px;color:${ph.color};letter-spacing:3px;font-family:monospace;margin-bottom:8px">${ph.label} 進捗</div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+    <div class="bebas" style="font-size:26px;color:${ph.color}">${daysLeft}日</div>
+    <div style="font-size:11px;color:#555;font-family:monospace">${ph.startDate.replace(/-/g,"/")} 〜 ${ph.endDate.replace(/-/g,"/")}</div>
+  </div>
+  ${pbar(phPassed,phTotal,ph.color,8)}
+  <div style="font-size:10px;color:#555;margin-top:5px;font-family:monospace">フェーズ経過 ${phPct}% — 残り${daysLeft}日</div>
+</div>
+
+<div style="font-size:10px;color:#555;letter-spacing:3px;font-family:monospace;margin-bottom:8px">MILESTONES</div>
+${msHtml}
+
+<div style="font-size:10px;color:#555;letter-spacing:3px;font-family:monospace;margin:14px 0 8px">
+  ${ph.label} カレンダー（${ph.weeks}）
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px">
+  ${["月","火","水","木","金","土","日"].map(d=>`<div style="text-align:center;font-size:9px;color:#555;padding:4px 0">${d}</div>`).join("")}
+</div>
+${calHtml}
+<div style="text-align:center;padding:20px 0 10px;font-size:11px;color:#333;font-family:monospace">
+  🏆 完全復帰目標 2027/01/24
+</div>`;
+}
+
+// ── MAIN RENDER ────────────────────────────────────────────────────
+function renderMain(){
+  const sa=document.getElementById("scroll-area");
+  const nav=document.getElementById("bottom-nav");
+
+  let content="";
+  if(state.tab==="today") content=buildToday();
+  else if(state.tab==="week") content=buildWeek();
+  else if(state.tab==="logs") content=buildLogs();
+  else content=buildCal();
+
+  sa.innerHTML=buildHeader()+`<div style="padding:14px 0">${content}</div>`;
+  nav.innerHTML=buildNav();
+}
+
+function render(){
+  renderMain();
+  renderSheet();
+}
+
+// ── GLOBAL ACTIONS ─────────────────────────────────────────────────
+window.toggle=toggle;
+window.setPhase=(id)=>{ state.phase=id; state.openDays=new Set(); render(); };
+window.setTab=(t)=>{ state.tab=t; render(); };
+window.toggleDay=(dayId)=>{
+  const key="__manual__"+dayId;
+  const ph=state.phase;
+  const todayKey=`p${ph}-${state.todayId}`;
+  // First interaction: if it was auto-open today, mark manual
+  if(dayId===todayKey&&!state.openDays.has(dayId)&&!state.openDays.has(key)){
+    state.openDays.add(key); state.openDays.add(dayId); // will toggle below
+  }
+  if(state.openDays.has(dayId)) state.openDays.delete(dayId);
+  else state.openDays.add(dayId);
+  renderMain();
+};
+window.toggleExpand=(taskId)=>{
+  if(state.expandedTasks.has(taskId)) state.expandedTasks.delete(taskId);
+  else state.expandedTasks.add(taskId);
+  renderMain();
+};
+
+// ── INIT ───────────────────────────────────────────────────────────
+render();
+
+// PWA install prompt (iOS guidance)
+window.addEventListener("appinstalled",()=>console.log("PWA installed!"));
+</script>
+</body>
+</html>
